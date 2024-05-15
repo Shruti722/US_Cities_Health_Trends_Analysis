@@ -1,4 +1,4 @@
-# Final Project: Health Trend Analysis in US Cities
+# Health Trend Analysis in US Cities
 This repository contains the R code and analyses for the "Final Project," focusing on health trend analysis in 26 U.S. states. The project utilizes datasets from Data World and the CDC, exploring mortality and morbidity rates across different diseases and categories such as cancer, tobacco, substance abuse, violence, obesity, and lack of nutrition.
 
 ## Dataset Overview
@@ -20,5 +20,7 @@ Challenges include web scraping and data cleaning.
 Approaches include if-else statements for data analysis and visualization.
 ## Sources
 Data World: https://data.world/health/big-cities-health 
+
 CDC: https://www.cdc.gov/nchs/pressroom/sosmap/suicide-mortality/suicide.htm
+
 Maternal Mortality: https://www.macrotrends.net/global-metrics/countries/USA/united-states/maternal-mortality-rate
