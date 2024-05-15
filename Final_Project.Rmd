@@ -1,0 +1,212 @@
+---
+name: "Shruti Kalaskar"
+title: "Final_Project"
+output:
+  html_document: default
+  pdf_document: default
+date: '2022-04-29'
+---
+### Library
+```{r code chunk 1, include=FALSE}
+
+library(tidyverse)
+library(dplyr)
+library(lubridate)
+library(plotly)
+library(ggplot2)
+library(gganimate)
+library(rvest)
+library(scales)
+library(rvest)
+library(httr)
+
+```
+
+### Reading csv file
+```{r code chunk 2}
+health <- read_csv("Big_Cities_Health_Data_Inventory.csv")
+suicide <- read_csv("Deaths_by_suicide.csv")
+```
+### Web scraping
+```{r code chunk 3}
+url <- "https://www.macrotrends.net/countries/USA/united-states/maternal-mortality-rate"
+
+user_agent_string <- "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36"
+
+session <- html_session(url, user_agent(user_agent_string))
+
+webpage <- read_html(session, which = 2)
+
+maternal_death <- webpage %>% 
+  html_elements("table") %>%
+  .[[2]] %>%
+  html_table(header = TRUE)
+
+```
+
+### First step- Cleaning the Health data set
+### Deleting columns that are not required
+### Renaming columns
+```{r code chunk 4}
+health <- health %>%
+  select(-c(Methods,Notes))  %>%
+  rename(`Indicator (Per 100,000 people)` = Indicator) %>%
+  mutate(`Indicator (Per 100,000 people)` = gsub("\\(.*", " ", `Indicator (Per 100,000 people)`)) %>%
+  select(-(`BCHC Requested Methodology`))
+
+head(health)
+```
+
+### Cleaning maternal_death data set
+### Deleting columns that are not necessary 
+### Renaming few columns
+### Changing few columns to numeric
+```{r code chunk 5}
+
+maternal_death <- maternal_death[-1, ] 
+cols <- names(maternal_death) == "U.S. Maternal Mortality Rate - Historical Data"
+names(maternal_death)[cols] <- paste0("U.S. Maternal Mortality Rate - Historical Data", seq.int(sum(cols)))
+
+
+maternal_death <- maternal_death %>%
+  rename(Year = `U.S. Maternal Mortality Rate - Historical Data1`) %>%
+  rename(Death_rate = `U.S. Maternal Mortality Rate - Historical Data2`) %>%
+  select(-(`U.S. Maternal Mortality Rate - Historical Data3`)) %>%
+  mutate(Year = as.numeric(Year)) %>%
+  mutate(Death_rate = as.numeric(Death_rate))
+
+head(maternal_death)
+```
+
+### Cleaning suicide data set
+### Deleting columns that are not required
+### Keeping variable names the same to avoid confusion when combing with other data sets
+```{r code chunk 6}
+suicide <- suicide %>%
+  select(-(URL))
+
+head(suicide)
+```
+### Using health data set to find which disease causes most deaths
+### Have a plot of Value vs year, filter Value < 20000 to have a clear look at the graph
+```{r code chunk 7}
+health %>%
+  ggplot(aes(Value, `Indicator Category`)) +
+  geom_col() + theme_minimal() + scale_x_continuous(labels = comma) + ggtitle("Disease vs Death rate") + theme(plot.title = element_text(hjust = 0.5))
+
+health1 <- health %>%
+  filter(Value < 20000) %>%
+  ggplot(aes(Year,Value)) + geom_jitter()
+
+health1
+
+```
+
+## Indicator category- Demographics, HIV/AIDS, Life expectancy and death rate, Behavioral heath/substance abuse, Nutrition, Physical activity and obesity are the diseases with the most number of deaths.
+## Looking at the plot we can see that the value of mortality is higher between 0 to 1000 over all the years.
+
+### Focusing on top 4 diseases after Demographics and comparing it to gender and year
+```{r code chunk 8}
+
+health2 <- health %>%
+  filter(`Indicator Category` == c('HIV/AIDS','Life Expectancy and Death Rate (Overall)','Behavioral Health/Substance Abuse','Nutrition, Physical Activity, & Obesity')) %>%
+  arrange(desc(Value)) %>%
+  filter(Gender == c('Female', 'Male'))
+  
+health2 %>%
+  ggplot(aes(`Indicator Category`,Value, fill = Gender)) +
+  geom_col()  + ggtitle("Top 4 Diseases compared to Value and Gender") + theme(plot.title = element_text(hjust = 0.5)) + theme(axis.text.x = element_text(angle = 25, vjust = 0.6, hjust=0.5))
+
+  
+```
+
+### Through the graph we can see that HIV/AIDS has number of mortality and Behavioral Health/Substance Abuse has the least. Most of the deaths that are seen for these diseases are for males. Behavioral Health/Substance Abuse indicates that more female died compared to men.
+
+
+### Interactive model
+### Plot of maternal death data set Death rate vs Year
+```{r code chunk 9}
+plot <- maternal_death %>%
+  ggplot(mapping = aes(x = Year, y= Death_rate)) + geom_point(size = 2, color = "blue") + geom_line() + ggtitle("Scatterplot of Death rate and Year for Maternal Mortality") + theme(plot.title = element_text(hjust = 0.5)) + xlab("Year")+ ylab("Death rate") 
+
+ggplotly(plot)
+
+cor(maternal_death$Year, maternal_death$Death_rate)
+```
+
+### In 2000, the death rate was 12 and in 2016 and 2017 it was 19. We can see there is an increase in the death rate over the period of time. The are 5 period of times when the death rate was constant over the years. (2001:2004-13, 2006:2008-14, 2009:2011-15,2012:2014-16,2016:2017-19)
+### The correlation between Year and death rate in maternal mortality is 0.9498468.
+
+### Suicide interactive model
+### Rate of deaths by suicide over the years for each state
+```{r code chunk 10}
+
+cor(suicide$YEAR,suicide$RATE)
+cor(suicide$YEAR,suicide$DEATHS)
+
+suicide <- suicide %>%
+  mutate(hover = paste0(STATE,"\n",RATE, "%"))
+
+suicide_graph <- plot_geo(suicide,locationmode = "USA-states", frame = ~YEAR) %>%
+  add_trace(locations = ~STATE,z= ~RATE, 
+            zmin = 0, zmax = max(suicide$RATE),
+            color = ~RATE, text = ~hover, hoverinfo = "text") %>%
+layout(geo = list(scope ="usa"), title = "Death rate in the USA by suicide\n2005 - 2020") 
+
+suicide_graph
+
+```
+
+### Over the years there have been changes to the percent of suicide rate that took place in different states. In 2005 New York reported the lowest death rate(6%) where as Montana reported the highest(21.7%). 
+### In the year 2020, New Jersey reported the lowest death rate(7.1%) where as Wyoming reported the highest(30.5). The death rates have increases a lot over the years, 2019 to 2020 had a lot of states with higher percentage of suicide rates. One potential reason for this could be isolation during COVID-19, or not having jobs that caused people to take such a step.
+
+### The correlation between Year and rate in the suicide data set is 0.2653732.
+### The correlation between Year and deaths in the suicide data set is 0.1073989.
+
+
+### Plot of Deaths vs Year for state
+```{r code chunk 11}
+suicide %>%
+  ggplot(aes(YEAR, DEATHS, color = STATE)) +
+  geom_point() +
+  geom_smooth(aes(group = YEAR), method = "lm", show.legend = FALSE) + theme(legend.key.size = unit(0.5, "cm")) 
+
+```
+### Combining the three data sets by year
+
+### From this plot we can see that from the years 2005 to almost 2014, there have been no reported cases of deaths across any states.
+
+### Plot for Place(Health) vs Death rate(maternal_death)
+```{r code chunk 12}
+revised <- maternal_death %>%
+  inner_join(health, by= c("Year" = "Year"))
+
+revised <- revised %>%
+  inner_join(suicide, by = c("Year" = "YEAR"))
+head(revised)
+
+revised <- revised %>%
+  mutate(Deaths_gl = ifelse(DEATHS> 1000, "Greater", "Lower"))
+head(revised)
+
+revised %>%
+  ggplot(aes(x = Death_rate, y= Place)) +
+  geom_point()
+
+```
+### The variable place has been taken from the health data set and the death rate has been taken from the maternal mortality data set.
+### In the plot above it is visble that there is one point at 18 for Long Branch, CA this can be considered as an outlier as it distant from the other observations.
+
+### Demographics, HIV/AIDS, Life expectancy and death rate, Behavioral heath/substance abuse, Nutrition, Physical activity and obesity are the diseases with the most number of deaths. From this most number of deaths are for males.
+### There is an increase in the maternal mortality rate over the period of time.
+### There is an increase in the suicide rate over the period of time.
+
+
+### An approach that was troublesome was web scrapping, as it contained to tables. It was difficult to scrape the second table with the exact coulmns in it. The second approch that was troublesome was having to rename the coulmn as all of them had the same coulmn name.
+### I had an approach related to if else for my data set that did not work.
+
+
+### Sources used:
+### https://data.world/health/big-cities-health
+### https://www.cdc.gov/nchs/pressroom/sosmap/suicide-mortality/suicide.htm
+### https://www.macrotrends.net/countries/USA/united-states/maternal-mortality-rate
